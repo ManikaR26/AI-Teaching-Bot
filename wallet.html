@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillSwap+ — Wallet</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin:0; background:#f4f5f7; }
+    header { background:#2d89ef; color:white; padding:15px; text-align:center; }
+    
+    .container {
+      max-width:900px;
+      margin:30px auto;
+      background:white;
+      padding:25px;
+      border-radius:10px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h2 { color:#2d89ef; margin-top:0; }
+
+    .balance-box {
+      background:#e8f1ff;
+      padding:20px;
+      border-radius:12px;
+      text-align:center;
+      margin-bottom:25px;
+    }
+
+    .balance-box h1 {
+      margin:10px 0;
+      font-size:36px;
+      color:#2d89ef;
+    }
+
+    .actions {
+      text-align:center;
+      margin-bottom:25px;
+    }
+
+    button {
+      padding:10px 20px;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:15px;
+      margin-right:10px;
+      margin-top:10px;
+    }
+
+    .add { background:#38a169; color:white; }
+    .add:hover { background:#2f8a57; }
+
+    .use { background:#2d89ef; color:white; }
+    .use:hover { background:#1b6edc; }
+
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
+
+    th { color:#2d89ef; font-size:14px; }
+    td { font-size:13px; color:#555; }
+
+    footer {
+      text-align:center;
+      color:#777;
+      padding:20px;
+      margin-top:40px;
+    }
+  </style>
+</head>
+<body>
+
+<header><h1>Your Wallet</h1></header>
+
+<div class="container">
+
+  <h2>Credit Balance</h2>
+  <div class="balance-box">
+    <span style="color:#555; font-size:14px;">Current Balance</span>
+    <h1 id="balance">—</h1>
+    <span style="color:#777; font-size:13px;">Every new user gets 200 free credits 🎉</span>
+  </div>
+
+  <div class="actions">
+    <button class="add">Add Credits</button>
+    <button class="use">Use Credits</button>
+  </div>
+
+  <h2>Transaction History</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Change</th>
+        <th>Reason</th>
+        <th>Balance After</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody id="txnTable"></tbody>
+  </table>
+
+</div>
+
+<footer>© 2025 SkillSwap+. All Rights Reserved.</footer>
+
+
+<!-- 🔥 Firebase Logic -->
+<script type="module">
+import { auth, db } from "./firebase.js";
+import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+auth.onAuthStateChanged(async(user)=>{
+  if(!user) return location.href = "login.html";
+
+  const userRef = doc(db, "users", user.uid);
+  const snap = await getDoc(userRef);
+  if(!snap.exists()) return;
+
+  const data = snap.data();
+
+  // Wallet Fix logic
+  let credits = data.walletBalance;
+  if (credits === undefined) {
+    credits = 200;
+    await updateDoc(userRef, { walletBalance: credits });
+  }
+
+  document.getElementById("balance").textContent = credits;
+
+  const transactions = data.walletTransactions || [];
+  const table = document.getElementById("txnTable");
+  table.innerHTML = "";
+
+  if(transactions.length === 0){
+    table.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:10px;">No transactions yet</td></tr>`;
+  } else {
+    transactions.slice().reverse().forEach((t,i)=>{
+      table.innerHTML += `
+      <tr>
+        <td>${i+1}</td>
+        <td style="color:${t.change>0?"#38a169":"#e53e3e"}; font-weight:bold;">
+          ${t.change>0?"+":""}${t.change}
+        </td>
+        <td>${t.reason}</td>
+        <td>${t.balanceAfter}</td>
+        <td>${new Date(t.date).toLocaleDateString()}</td>
+      </tr>`;
+    });
+  }
+});
+
+document.querySelector(".add").onclick = ()=> alert("Coming soon!");
+document.querySelector(".use").onclick = ()=> alert("Use credits when booking sessions!");
+</script>
+
+</body>
+</html>

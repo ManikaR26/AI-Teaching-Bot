@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillSwap+ — Mentors</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f5f6f8;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background: #2d89ef;
+      color: white;
+      padding: 14px 20px;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .search-section {
+      background: white;
+      padding: 15px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    input[type="text"], select {
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      min-width: 180px;
+    }
+
+    button {
+      background: #2d89ef;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #1b6edc;
+    }
+
+    .mentor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 18px;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      text-align: center;
+    }
+
+    .card img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 10px;
+    }
+
+    .card h3 {
+      margin: 6px 0;
+      font-size: 16px;
+      color: #333;
+    }
+
+    .skills {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .rating {
+      color: #f7b500;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Find a Mentor</h1>
+</header>
+
+<section class="search-section">
+  <input type="text" id="searchBox" placeholder="Search by name or skill...">
+  <select id="skillFilter">
+    <option value="all">All Skills</option>
+  </select>
+  <button id="searchBtn">Search</button>
+</section>
+
+<section class="mentor-grid" id="mentorGrid"></section>
+
+<footer>
+  © 2025 SkillSwap+ | Made with ❤️ by students
+</footer>
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import { 
+  collection, query, where, getDocs 
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+// Ensure logged in
+auth.onAuthStateChanged((user) => {
+  if (!user) location.href = "login.html";
+});
+
+let mentors = [];
+const grid = document.getElementById("mentorGrid");
+const searchBox = document.getElementById("searchBox");
+const skillFilter = document.getElementById("skillFilter");
+const searchBtn = document.getElementById("searchBtn");
+
+// Load mentors from Firestore
+async function loadMentors() {
+  mentors = [];
+  skillFilter.innerHTML = `<option value="all">All Skills</option>`;
+
+  const q = query(collection(db, "users"), where("role", "==", "mentor"));
+  const snapshot = await getDocs(q);
+
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    mentors.push({
+      id: doc.id,
+      name: data.name,
+      skills: data.skills || [],
+      rating: data.rating || 0,
+      img: data.photo || `https://i.pravatar.cc/90?u=${doc.id}`
+    });
+
+    // Populate skill dropdown
+    (data.skills || []).forEach(skill=>{
+      if(!Array.from(skillFilter.options).some(opt => opt.value === skill)){
+        skillFilter.innerHTML += `<option value="${skill}">${skill}</option>`;
+      }
+    });
+  });
+
+  renderMentors(mentors);
+}
+
+// Render mentor cards
+function renderMentors(list) {
+  grid.innerHTML = "";
+
+  if (list.length === 0) {
+    grid.innerHTML = `
+      <p style="width:100%; text-align:center; color:#777">No mentors found.</p>`;
+    return;
+  }
+
+  list.forEach(m => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `
+      <img src="${m.img}">
+      <h3>${m.name}</h3>
+      <div class="skills">${m.skills.join(", ")}</div>
+      <div class="rating">⭐ ${m.rating}</div>
+      <button class="view-btn">View Profile</button>
+    `;
+
+    div.querySelector(".view-btn").onclick = () => viewProfile(m.id);
+    grid.appendChild(div);
+  });
+}
+
+// Search + filter function
+function applyFilter() {
+  const query = searchBox.value.toLowerCase();
+  const skill = skillFilter.value;
+
+  const filtered = mentors.filter(m => {
+    const matchName = m.name.toLowerCase().includes(query);
+    const matchSkill = skill === "all" || m.skills.includes(skill);
+    return matchName && matchSkill;
+  });
+
+  renderMentors(filtered);
+}
+
+// View profile
+function viewProfile(id) {
+  window.location.href = "mentor-profile.html?id=" + id;
+}
+
+
+// Event Listeners
+searchBtn.addEventListener("click", applyFilter);
+searchBox.addEventListener("keyup", (e) => {
+  if (e.key === "Enter") applyFilter();
+});
+
+loadMentors();
+</script>
+
+
+</body>
+</html>

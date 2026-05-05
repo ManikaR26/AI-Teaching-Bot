@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillSwap+ | Student Dashboard</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded" rel="stylesheet" />
+
+  <style>
+    body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: #f3f5f9; }
+    nav { background: white; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 50; }
+    .nav-container { max-width: 1100px; margin: auto; display: flex; justify-content: space-between; align-items: center; }
+    .nav-brand { font-size: 22px; font-weight: 700; color: #2d89ef; cursor: pointer; }
+    .nav-links { display: flex; align-items: center; gap: 16px; }
+    .nav-links a { text-decoration: none; color: #555; font-weight: 500; }
+    .nav-links a.active { color: #2d89ef; font-weight: 700; }
+
+    .wallet-tag {
+      background: #2d89ef10;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d89ef;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .welcome { font-size: 26px; font-weight: 600; color: #333; margin-bottom: 25px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+    .card { background: white; padding: 22px; border-radius: 12px; box-shadow: 0 3px 10px rgba(0,0,0,0.08); transition: .25s; cursor: pointer; }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 5px 18px rgba(0,0,0,0.15); }
+    .icon { font-size: 42px; color: #2d89ef; }
+    footer { text-align: center; color: #777; padding: 20px; margin-top: 30px; font-size: 14px; }
+  </style>
+</head>
+
+<body>
+
+  <!-- NAVBAR -->
+  <nav>
+    <div class="nav-container">
+      <div class="nav-brand" onclick="location.href='student_dashboard.html'">SkillSwap+</div>
+      <div class="nav-links">
+        <a href="find_mentor.html" class="active">Find Mentors</a>
+        <a href="requests.html">Requests</a>
+        <a href="wallet.html">Wallet</a>
+        <a href="profile.html">Profile</a>
+        <a href="#" onclick="logout()" style="color:red;font-weight:600">Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="welcome">👋 Welcome!</div>
+
+    <div class="grid">
+      <div class="card" onclick="location.href='find_mentor.html'">
+        <span class="material-symbols-rounded icon">search</span>
+        <h3>Find Mentors</h3>
+        <p>List of mentors to learn from.</p>
+      </div>
+
+      <div class="card" onclick="location.href='create_request.html'">
+        <span class="material-symbols-rounded icon">pending_actions</span>
+        <h3>Session Requests</h3>
+        <p>Send & track session requests.</p>
+      </div>
+
+      <div class="card" onclick="location.href='wallet.html'">
+        <span class="material-symbols-rounded icon">account_balance_wallet</span>
+        <h3>Wallet</h3>
+        <p>View and manage credits.</p>
+      </div>
+
+      <div class="card" onclick="location.href='profile.html'">
+        <span class="material-symbols-rounded icon">person</span>
+        <h3>Profile</h3>
+        <p>Update personal details.</p>
+      </div>
+
+      <div class="card" onclick="location.href='chat_student.html'">
+        <span class="material-symbols-rounded icon">chat</span>
+        <h3>Messages</h3>
+        <p>Chat with mentors.</p>
+      </div>
+
+      <div class="card" onclick="location.href='notes.html'">
+        <span class="material-symbols-rounded icon">notes</span>
+        <h3>Your Notes</h3>
+        <p>Access saved notes.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    © 2025 SkillSwap+. All Rights Reserved.
+  </footer>
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return location.href = "login.html";
+
+  const userDoc = await getDoc(doc(db, "users", user.uid));
+  if (!userDoc.exists()) return;
+
+  const data = userDoc.data();
+  document.querySelector(".welcome").textContent = `👋 Welcome, ${data.name}!`;
+});
+
+window.logout = () => {
+  auth.signOut().then(() => location.href = "login.html");
+};
+</script>
+
+</body>
+</html>

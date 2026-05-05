@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkillSwap+ — Reviews</title>
+
+<style>
+  body { margin:0; font-family: Segoe UI, sans-serif; background:#f5f6f8; }
+  header { background:#2d89ef; padding:15px; color:white; text-align:center; }
+
+  .container {
+    max-width:900px; margin:20px auto; background:white;
+    padding:20px; border-radius:10px;
+    box-shadow:0 3px 12px rgba(0,0,0,0.08);
+  }
+
+  h2 { margin-top:0; color:#2d89ef; }
+  .search-box { margin-bottom:15px; display:flex; gap:10px; }
+  .search-box input { flex:1; padding:8px; border:1px solid #ccc; border-radius:6px; }
+  .review-card {
+    border:1px solid #eee; border-radius:8px;
+    padding:15px; margin-bottom:12px; background:#fbfdff;
+  }
+  .rating { color:#f7b500; margin-bottom:6px; font-size:15px; }
+  .target { color:#2d89ef; font-size:14px; margin-bottom:6px; }
+  .reviewer { font-size:13px; color:#555; }
+  .no-data { text-align:center; padding:20px; color:#888; }
+  footer { text-align:center; margin-top:35px; font-size:12px; color:#777; }
+</style>
+
+</head>
+<body>
+
+<header>
+  <h1>Reviews You Received</h1>
+</header>
+
+<div class="container">
+  <h2>All Reviews</h2>
+
+  <div class="search-box">
+    <input type="text" id="searchBox" placeholder="Search by session/note title or keyword...">
+  </div>
+
+  <div id="avgStats" style="margin-bottom:12px; font-size:14px; color:#333;">
+    Avg Rating: ⭐ — | Total Reviews: —
+  </div>
+
+  <div id="reviewsList"></div>
+</div>
+
+<footer>© 2025 SkillSwap+ | Feedback improves learning ❤️</footer>
+
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  collection,
+  getDocs,
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+// DOM elements
+const reviewList = document.getElementById("reviewsList");
+const searchBox = document.getElementById("searchBox");
+const avgStats = document.getElementById("avgStats");
+
+let allReviews = [];
+
+// On login state change
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return (window.location.href = "login.html");
+
+  await loadReviews(user.uid);
+  updateStats();
+  render(allReviews);
+
+  searchBox.addEventListener("input", filterReviews);
+});
+
+async function loadReviews(uid) {
+  try {
+    const ref = collection(db, "users", uid, "reviews");
+    const snap = await getDocs(ref);
+
+    allReviews = snap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (err) {
+    console.error(err);
+    reviewList.innerHTML =
+      `<div class='no-data'>Error loading reviews ❌</div>`;
+  }
+}
+
+function updateStats() {
+  if (allReviews.length === 0) {
+    avgStats.textContent = "Avg Rating: ⭐ 0 | Total Reviews: 0";
+    return;
+  }
+
+  const avg =
+    (allReviews.reduce((a, r) => a + r.rating, 0) / allReviews.length).toFixed(1);
+
+  avgStats.textContent = `Avg Rating: ⭐ ${avg} | Total Reviews: ${allReviews.length}`;
+}
+
+function render(list) {
+  reviewList.innerHTML = "";
+
+  if (list.length === 0) {
+    reviewList.innerHTML =
+      `<div class='no-data'>No reviews yet.</div>`;
+    return;
+  }
+
+  list.forEach((r) => {
+    reviewList.innerHTML += `
+      <div class="review-card">
+        <div class="rating">${"⭐".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</div>
+        <div class="target">${r.target || "General Feedback"}</div>
+        <div class="review-text">${r.comment}</div>
+        <div class="reviewer">— ${r.reviewerName || "Student"}</div>
+      </div>
+    `;
+  });
+}
+
+function filterReviews() {
+  const q = searchBox.value.toLowerCase();
+  const filtered = allReviews.filter((r) =>
+    (r.target || "").toLowerCase().includes(q) ||
+    r.comment.toLowerCase().includes(q)
+  );
+
+  render(filtered);
+  updateStats();
+}
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillSwap+ | Chat</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 28%;
+      background: #fff;
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      background: #2d89ef;
+      color: white;
+      padding: 15px;
+      font-size: 18px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .mentor-item {
+      padding: 15px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+
+    .mentor-item img {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .mentor-item:hover {
+      background: #f7f9fc;
+    }
+
+    .mentor-name {
+      font-size: 15px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .mentor-lastmsg {
+      font-size: 12px;
+      color: #777;
+    }
+
+    /* Chat area */
+    .chat {
+      width: 72%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 15px;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .chat-header img {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+    }
+
+    .chat-header h3 {
+      margin: 0;
+      font-size: 16px;
+      color: #333;
+    }
+
+    .chat-header span {
+      font-size: 12px;
+      color: #35c759;
+    }
+
+    /* Messages area */
+    .messages {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background: #e5ebf1;
+    }
+
+    .msg {
+      max-width: 70%;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      border-radius: 14px;
+      line-height: 1.4;
+      font-size: 14px;
+    }
+
+    .sent {
+      background: #2d89ef;
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 2px;
+    }
+
+    .received {
+      background: white;
+      color: #333;
+      margin-right: auto;
+      border-bottom-left-radius: 2px;
+      border: 1px solid #ddd;
+    }
+
+    /* small name + time inside bubble */
+    .msg-sender {
+      font-size: 11px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      opacity: 0.9;
+    }
+
+    .msg-time {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    /* Input bar */
+    .input-area {
+      display: flex;
+      padding: 12px;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      gap: 10px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 25px;
+      outline: none;
+      font-size: 14px;
+    }
+
+    .send-btn {
+      background: #2d89ef;
+      border: none;
+      padding: 0 20px;
+      border-radius: 25px;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .send-btn:hover {
+      background: #1b6edc;
+    }
+
+    /* Top buttons */
+    .top-btn {
+      position: absolute;
+      top: 10px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      color: #fff;
+      z-index: 20;
+    }
+    .dash-btn { left: 10px; background: #2d89ef; }
+    .logout-btn { right: 10px; background: #e63946; }
+
+  </style>
+</head>
+<body>
+
+<button class="top-btn dash-btn" onclick="goDashboard()">← Dashboard</button>
+<button class="top-btn logout-btn" onclick="logout()">Logout</button>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">Your Mentors</div>
+    <!-- mentor list injected by JS -->
+  </div>
+
+  <!-- Chat Window -->
+  <div class="chat">
+
+    <div class="chat-header" id="chatHeader">
+      <img src="https://i.pravatar.cc/48" alt="avatar">
+      <div>
+        <h3 id="mentorName">Select a Mentor</h3>
+        <span id="mentorStatus">—</span>
+      </div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg received">
+        <div class="msg-sender">System</div>
+        <div>Select a mentor to start chatting!</div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <input id="msgInput" placeholder="Type a message..." />
+      <button class="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+<!-- Firebase Required Scripts (must be BEFORE custom script) -->
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  doc, getDoc, setDoc, updateDoc, onSnapshot, collection,
+  query, orderBy, addDoc, serverTimestamp, where, getDocs
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+let currentChatUID = null;
+let currentMentorName = "";
+let userUID = null;
+let currentUserName = "You";
+let unsubscribeMessages = null;
+let unsubscribePresence = null;
+
+const messagesBox = document.getElementById("messages");
+const sidebarEl = document.querySelector(".sidebar");
+const statusEl = document.getElementById("mentorStatus");
+
+// AUTH GUARD
+auth.onAuthStateChanged(async(user)=>{
+  if(!user) return location.href = "login.html";
+  userUID = user.uid;
+
+  const me = await getDoc(doc(db, "users", userUID));
+  if(me.exists()) currentUserName = me.data().name || "You";
+
+  updatePresence();
+  setInterval(updatePresence, 45000);
+
+  loadMentors();
+});
+
+// PRESENCE UPDATE
+async function updatePresence(){
+  if(!userUID) return;
+  await setDoc(doc(db,"users",userUID), {
+    lastActive: serverTimestamp()
+  },{merge:true});
+}
+
+// LOAD mentors (chat list)
+async function loadMentors(){
+  const q = query(collection(db,"users"), where("role","==","mentor"));
+  const snap = await getDocs(q);
+
+  snap.forEach(docSnap=>{
+    if(docSnap.id === userUID) return;
+    const m = docSnap.data();
+
+    const div = document.createElement("div");
+    div.className = "mentor-item";
+    div.innerHTML = `
+      <img src="https://i.pravatar.cc/48?u=${docSnap.id}">
+      <div>
+        <div class="mentor-name">${m.name}</div>
+        <div class="mentor-lastmsg">Tap to chat</div>
+      </div>
+    `;
+    div.onclick = ()=> openChat(docSnap.id, m.name, div.querySelector(".mentor-lastmsg"));
+    sidebarEl.appendChild(div);
+
+    loadLastMessagePreview(docSnap.id, div.querySelector(".mentor-lastmsg"));
+  });
+}
+
+// Show last message under mentor name
+async function loadLastMessagePreview(otherUid, el){
+  const chatId = getChatID(userUID, otherUid);
+  const q = query(collection(db, "chats", chatId, "messages"),
+    orderBy("timestamp","desc"), limit=1);
+
+  try{
+    const snap = await getDocs(q);
+    if(!snap.empty){
+      const msg = snap.docs[0].data();
+      const prefix = msg.from === userUID ? "You: " : "Them: ";
+      el.textContent = prefix + msg.text.substring(0,35);
+    }
+  }catch(e){
+    el.textContent = "Tap to chat";
+  }
+}
+
+// Unique chat ID
+function getChatID(a,b){
+  return [a,b].sort().join("_");
+}
+
+// OPEN A CHAT THREAD
+function openChat(mentorId, mentorName, previewEl){
+  currentChatUID = mentorId;
+  currentMentorName = mentorName;
+  document.getElementById("mentorName").textContent = mentorName;
+  statusEl.textContent = "—";
+
+  messagesBox.innerHTML = "Loading...";
+
+  if(unsubscribeMessages) unsubscribeMessages();
+  if(unsubscribePresence) unsubscribePresence();
+
+  const chatId = getChatID(userUID, mentorId);
+  const msgRef = collection(db, "chats", chatId, "messages");
+
+  unsubscribeMessages = onSnapshot(
+    query(msgRef, orderBy("timestamp")),
+    snap=>{
+      messagesBox.innerHTML = "";
+      snap.forEach(docSnap=>{
+        const msg = docSnap.data();
+        const isMe = msg.from === userUID;
+
+        const div = document.createElement("div");
+        div.className = "msg " + (isMe ? "sent" : "received");
+        const name = msg.fromName || (isMe ? "You" : mentorName);
+        const time = msg.timestamp?.toDate().toLocaleTimeString("en-IN",{
+          hour:"numeric", minute:"2-digit"
+        }) || "";
+
+        div.innerHTML = `
+          <div class="msg-sender">${name}</div>
+          <div>${msg.text}</div>
+          <div class="msg-time">${time}</div>
+        `;
+
+        messagesBox.appendChild(div);
+      });
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
+  );
+
+  unsubscribePresence = onSnapshot(doc(db,"users",mentorId),(snap)=>{
+    const d = snap.data();
+    if(!d?.lastActive){
+      statusEl.textContent = "—";
+      return;
+    }
+    const diff = Date.now() - d.lastActive.toDate().getTime();
+
+    if(diff < 2 * 60 * 1000){
+      statusEl.textContent = "Online";
+      statusEl.style.color = "#35c759";
+    } else {
+      statusEl.textContent = "Last seen";
+      statusEl.style.color = "#999";
+    }
+  });
+}
+
+// SEND MESSAGE
+async function sendMessage(){
+  const input = document.getElementById("msgInput");
+  const text = input.value.trim();
+  if(!text || !currentChatUID) return;
+
+  const chatId = getChatID(userUID,currentChatUID);
+  await addDoc(collection(db,"chats",chatId,"messages"),{
+    from: userUID,
+    fromName: currentUserName,
+    text,
+    timestamp: serverTimestamp()
+  });
+
+  await updateDoc(doc(db,"chats",chatId),{
+    lastMessage: text,
+    lastTimestamp: serverTimestamp()
+  }).catch(()=>{});
+
+  input.value = "";
+  updatePresence();
+}
+
+// Logout
+document.querySelector(".logout-btn").addEventListener("click", async()=>{
+  await auth.signOut();
+  location.href="login.html";
+});
+
+// Back to dashboard
+async function goDashboard(){
+  const u = auth.currentUser;
+  if(!u) return location.href="login.html";
+
+  const snap = await getDoc(doc(db,"users",u.uid));
+  const role = snap.data()?.role;
+
+  location.href = role==="mentor" ? "mentor_dashboard.html" :
+                  role==="student" ? "student_dashboard.html" :
+                  "index.html";
+}
+window.goDashboard = goDashboard;
+window.sendMessage = sendMessage;
+</script>
+
+</body>
+</html>

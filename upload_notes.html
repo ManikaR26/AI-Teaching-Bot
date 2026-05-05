@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Upload Study Notes • SkillSwap+</title>
+
+<style>
+  body { margin:0; font-family:Arial, sans-serif; background:#f4f5f7; }
+  header { background:#2d89ef; color:white; text-align:center; padding:18px; font-size:22px; font-weight:600; }
+
+  .container {
+    max-width:650px; margin:30px auto; background:white;
+    padding:25px; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.10);
+  }
+
+  label { font-size:14px; font-weight:600; margin-bottom:6px; display:block; color:#333; }
+  select, input, textarea {
+    width:100%; padding:12px; margin-bottom:15px;
+    border-radius:8px; border:1px solid #ccc; background:#fafafa;
+  }
+
+  textarea { height:90px; resize:vertical; }
+
+  button {
+    width:100%; background:#2d89ef; color:white;
+    padding:12px; border-radius:8px; border:none;
+    font-size:15px; cursor:pointer; font-weight:600;
+  }
+  button:hover { background:#1664c4; }
+</style>
+</head>
+
+<body>
+
+<header>Upload Study Notes</header>
+
+<div class="container">
+  <label>Select Student</label>
+  <select id="studentSelect" required>
+    <option disabled selected>Loading...</option>
+  </select>
+
+  <label>Select Skill / Topic</label>
+  <select id="skillSelect" required>
+    <option disabled selected>Select a student first</option>
+  </select>
+
+  <label>Notes Title</label>
+  <input type="text" id="titleInput" placeholder="e.g., HTML Basics" required>
+
+  <label>Description (Optional)</label>
+  <textarea id="descInput" placeholder="Short description..."></textarea>
+
+  <label>Paste PDF / Notes Link</label>
+  <input type="text" id="pdfInput" placeholder="Google Drive / PDF Link" required>
+
+  <button id="uploadBtn">Upload Notes</button>
+</div>
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  collection, query, where, getDocs, addDoc, doc, getDoc
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+// Ensure mentor login
+auth.onAuthStateChanged(async (user)=>{
+  if(!user){
+    alert("Login required!");
+    return window.location.href="login.html";
+  }
+  loadStudents(user.uid);
+});
+
+// ⚡ Load unique students from sessions where mentor = logged in user
+async function loadStudents(mentorId){
+  const q = query(collection(db,"sessions"), where("mentorId","==",mentorId));
+  const snap = await getDocs(q);
+
+  const studentSet = new Set();
+  snap.forEach(d=>{
+    const s = d.data().studentId;
+    if(s) studentSet.add(s);
+  });
+
+  const dropdown = document.getElementById("studentSelect");
+  dropdown.innerHTML = `<option disabled selected>Select student</option>`;
+
+  for(const stu of studentSet){
+    const studentSnap = await getDoc(doc(db,"users", stu));
+    if(studentSnap.exists()){
+      const opt = document.createElement("option");
+      opt.value = stu;
+      opt.textContent = studentSnap.data().name;
+      dropdown.appendChild(opt);
+    }
+  }
+}
+
+// 🧠 Load skills for sessions with selected student
+document.getElementById("studentSelect").addEventListener("change", async ()=>{
+  const studentId = document.getElementById("studentSelect").value;
+  const mentorId = auth.currentUser.uid;
+
+  const q = query(
+    collection(db,"sessions"),
+    where("mentorId","==",mentorId),
+    where("studentId","==",studentId)
+  );
+  const snap = await getDocs(q);
+
+  const skillDropdown = document.getElementById("skillSelect");
+  skillDropdown.innerHTML = "";
+
+  if(snap.empty){
+    skillDropdown.innerHTML = `<option>No topics available</option>`;
+    return;
+  }
+
+  snap.forEach(d=>{
+    const data = d.data();
+    const option = document.createElement("option");
+    option.value = data.skillTitle || data.topic;
+    option.textContent = data.skillTitle || data.topic;
+    skillDropdown.appendChild(option);
+  });
+});
+
+// 📌 Upload Notes Click
+document.getElementById("uploadBtn").addEventListener("click", async()=>{
+  const studentId = studentSelect.value;
+  const topic = skillSelect.value;
+  const title = titleInput.value.trim();
+  const desc = descInput.value.trim();
+  const pdfUrl = pdfInput.value.trim();
+
+  if(!studentId || !topic || !title || !pdfUrl)
+    return alert("Fill all required fields.");
+
+  await addDoc(collection(db,"notes"),{
+    mentorId: auth.currentUser.uid,
+    studentId,
+    topic,
+    title,
+    desc,
+    pdfUrl,
+    createdAt: new Date()
+  });
+
+  alert("Notes uploaded successfully!");
+window.location.href = "./mentor_dashboard.html";
+
+});
+</script>
+
+</body>
+</html>

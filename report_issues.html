@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Issue – SkillSwap+</title>
+<style>
+  body { font-family: Arial; background:#f4f5f7; padding:40px; }
+  .box { max-width:600px; background:white; padding:25px; margin:auto; border-radius:12px;
+         box-shadow:0 3px 10px rgba(0,0,0,.08); }
+  textarea { width:100%; height:120px; padding:12px; font-size:14px;
+             border:1px solid #ccc; border-radius:8px; resize:none; }
+  button { margin-top:15px; width:100%; padding:12px; background:#2d89ef;
+           color:white; border:none; font-size:16px; border-radius:8px; cursor:pointer; }
+</style>
+</head>
+
+<body>
+
+<div class="box">
+  <h2>Report an Issue</h2>
+  <p style="color:#555;font-size:14px">Tell us what went wrong. We’ll fix it ASAP!</p>
+  <textarea id="issueText" placeholder="Describe your issue here..."></textarea>
+  <button onclick="submitIssue()">Submit</button>
+</div>
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  collection,
+  addDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+async function submitIssue() {
+  const issueText = document.getElementById("issueText").value.trim();
+  if (!issueText) return alert("Please describe your issue!");
+
+  const user = auth.currentUser;
+  if (!user) return location.href = "login.html";
+
+  try {
+    await addDoc(collection(db, "issues"), {
+      userId: user.uid,
+      text: issueText,
+      status: "pending",
+      createdAt: serverTimestamp()
+    });
+
+    alert("✔ Your report has been submitted!");
+    document.getElementById("issueText").value = "";
+  } catch (err) {
+    console.error(err);
+    alert("Error submitting issue!");
+  }
+}
+window.submitIssue = submitIssue;
+</script>
+
+
+</body>
+</html>

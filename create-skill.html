@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Skill | SkillSwap+</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #eef3fa;
+  margin: 0;
+  padding: 0;
+}
+.container {
+  max-width: 600px;
+  margin: 40px auto;
+  background: #fff;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.09);
+}
+h2 {
+  margin-bottom: 15px;
+  color: #2d89ef;
+  text-align: center;
+}
+label { font-size: 14px; font-weight: 600; margin-top: 10px; display: block; }
+input, select, textarea {
+  width: 100%; padding: 10px;
+  border-radius: 8px; border: 1px solid #ccc;
+  font-size: 14px; margin-top: 5px;
+}
+textarea { min-height: 100px; resize: vertical; }
+
+.tags-container { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.tag {
+  background: #eaf0ff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tag button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  color: #2d89ef;
+}
+
+button {
+  margin-top: 15px;
+  width: 100%;
+  background: #2d89ef;
+  color: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+}
+button:hover { background: #1b6edc; }
+
+.error {
+  margin-top: 10px;
+  color: #e63946;
+  font-size: 13px;
+  text-align: center;
+}
+.back-btn {
+  margin-bottom: 15px;
+  background: #555;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <button class="back-btn" onclick="goBack()">← Back to Dashboard</button>
+  <h2>Create a New Skill</h2>
+
+  <form id="skillForm">
+    <label>Title</label>
+    <input id="title" required placeholder="e.g. React Basics">
+
+    <label>Description</label>
+    <textarea id="description" required placeholder="What will students learn?"></textarea>
+
+    <label>Tags</label>
+    <input id="tagInput" placeholder="Press Enter to add tag">
+    <div class="tags-container" id="tagList"></div>
+
+    <label>Level</label>
+    <select id="level">
+      <option value="beginner">Beginner</option>
+      <option value="intermediate" selected>Intermediate</option>
+      <option value="advanced">Advanced</option>
+    </select>
+
+    <label>Format</label>
+    <select id="format">
+      <option value="live">Live Session</option>
+      <option value="notes">Notes</option>
+      <option value="recorded">Recorded Video</option>
+    </select>
+
+    <label>Credit Price (optional)</label>
+    <input id="priceCredits" type="number" min="0" placeholder="0 = Free">
+
+    <button type="submit">Publish Skill</button>
+    <div class="error" id="formError" style="display:none;"></div>
+  </form>
+</div>
+
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  addDoc, collection, serverTimestamp,
+  doc, getDoc
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+// ⭐ TAG HANDLING
+const tagInput = document.getElementById("tagInput");
+const tagList = document.getElementById("tagList");
+let tags = [];
+
+tagInput.addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){
+    e.preventDefault();
+    let t = tagInput.value.trim().toLowerCase();
+    if(t && !tags.includes(t)) {
+      tags.push(t);
+      renderTags();
+    }
+    tagInput.value = "";
+  }
+});
+
+function renderTags(){
+  tagList.innerHTML = "";
+  tags.forEach((t,i)=>{
+    tagList.innerHTML += `<span class="tag">${t} <button onclick="removeTag(${i})">&times;</button></span>`;
+  });
+}
+window.removeTag = (i)=>{
+  tags.splice(i,1);
+  renderTags();
+};
+
+// ⭐ AUTH + ROLE CHECK
+auth.onAuthStateChanged(async (user)=>{
+  if(!user) return location.href="login.html";
+
+  const ref = doc(db,"users",user.uid);
+  const snap = await getDoc(ref);
+
+  if(!snap.exists() || snap.data().role !== "mentor"){
+    alert("Mentor access required");
+    return location.href="student_dashboard.html";
+  }
+});
+
+// ⭐ SUBMIT FORM
+document.getElementById("skillForm").addEventListener("submit", async(e)=>{
+  e.preventDefault();
+  const user = auth.currentUser;
+  if(!user) return;
+
+  if(tags.length === 0) return showError("Add at least one tag!");
+
+  try{
+    await addDoc(collection(db,"skills"),{
+      ownerId: user.uid,
+      title: title.value.trim(),
+      description: description.value.trim(),
+      tags,
+      level: level.value,
+      format: format.value,
+      price: Number(priceCredits.value || 0),
+      createdAt: serverTimestamp()
+    });
+
+    alert("Skill Published Successfully!");
+    location.href="mentor_dashboard.html";
+  }
+  catch(err){
+    showError(err.message);
+  }
+});
+
+function showError(msg){
+  const e=document.getElementById("formError");
+  e.textContent=msg;
+  e.style.display="block";
+}
+
+</script>
+
+<script>
+function goBack(){
+  location.href="mentor_dashboard.html";
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Profile — SkillSwap+</title>
+
+<style>
+  body {
+    margin:0;
+    font-family: Inter, sans-serif;
+    background:#f4f5f7;
+    display:flex;
+    justify-content:center;
+    padding:25px;
+  }
+  .container {
+    width:100%;
+    max-width:700px;
+    background:white;
+    padding:24px;
+    border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.06);
+  }
+  h2 {
+    text-align:center;
+    margin-bottom:16px;
+  }
+  label {
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:6px;
+    display:block;
+  }
+  input, textarea {
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #dcdcdc;
+    margin-bottom:14px;
+    font-size:14px;
+  }
+  textarea { height:80px }
+  .skills {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:8px;
+  }
+  .chip {
+    background:#eaecef;
+    padding:6px 10px;
+    border-radius:20px;
+    font-size:13px;
+  }
+  .btn-row {
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+    margin-top:16px;
+  }
+  button {
+    padding:10px 16px;
+    font-size:14px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+  }
+  .primary { background:#2563eb; color:white; }
+  .secondary { background:#e5e7eb; color:#333; }
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h2>Your Profile</h2>
+
+  <label>Name</label>
+  <input id="nameInput" type="text" />
+
+  <label>Email (non-editable)</label>
+  <input id="emailInput" type="email" disabled />
+
+  <label>Bio</label>
+  <textarea id="bioInput"></textarea>
+
+  <label>Your Skills</label>
+  <div class="skills" id="skillList"></div>
+
+  <div class="btn-row">
+    <button class="secondary" onclick="goDashboard()">← Back</button>
+    <button class="primary" onclick="saveProfile()">Save</button>
+  </div>
+</div>
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  doc, getDoc, updateDoc
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+let userUID = null;
+let userData = {};
+
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return location.href="login.html";
+  userUID = user.uid;
+  loadProfile();
+});
+
+async function loadProfile() {
+  const snap = await getDoc(doc(db,"users",userUID));
+  if (!snap.exists()) return;
+
+  userData = snap.data();
+  document.getElementById("nameInput").value = userData.name || "";
+  document.getElementById("emailInput").value = userData.email || "";
+  document.getElementById("bioInput").value = userData.bio || "";
+
+  const skillsBox = document.getElementById("skillList");
+  skillsBox.innerHTML = "";
+  (userData.skills || []).forEach(s=>{
+    skillsBox.innerHTML += `<span class="chip">${s}</span>`;
+  });
+}
+
+window.saveProfile = async () => {
+  await updateDoc(doc(db,"users",userUID),{
+    name: document.getElementById("nameInput").value.trim(),
+    bio: document.getElementById("bioInput").value.trim()
+  });
+
+  alert("Profile updated!");
+  loadProfile();
+};
+
+window.goDashboard = () => {
+  location.href="student_dashboard.html";
+};
+</script>
+
+</body>
+</html>

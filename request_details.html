@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillSwap+ — Request Details</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin:0; background:#f4f5f7; }
+    header { background:#2d89ef; color:white; padding:15px; text-align:center; }
+    .container { max-width:800px; margin:30px auto; background:white; padding:25px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+    h2 { margin-top:0; color:#2d89ef; }
+    .section { margin-bottom:25px; }
+    .label { color:#555; font-size:14px; margin-bottom:4px; display:block; }
+    .value { font-size:16px; font-weight:bold; color:#333; margin-bottom:10px; }
+    .box { background:#f0f6ff; padding:15px; border-radius:8px; margin-bottom:20px; }
+    button { padding:10px 20px; border:none; border-radius:6px; font-size:15px; cursor:pointer; margin-right:10px; }
+    .accept { background:#38a169; color:white; }
+    .accept:hover { background:#2f8a57; }
+    .reject { background:#e53e3e; color:white; }
+    .reject:hover { background:#c53030; }
+    .back-btn { background:#2d89ef; color:white; }
+    .back-btn:hover { background:#1b6edc; }
+    footer { text-align:center; padding:20px; color:#777; margin-top:40px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Session Request Details</h1>
+</header>
+
+<div class="container">
+  
+  <h2>Request Information</h2>
+
+  <div class="box">
+    <div class="section">
+      <span class="label">Student Name</span>
+      <div class="value" id="studentName">—</div>
+    </div>
+
+    <div class="section">
+      <span class="label">Requested Skill</span>
+      <div class="value" id="skillName">—</div>
+    </div>
+
+    <div class="section">
+      <span class="label">Preferred Date & Time</span>
+      <div class="value" id="requestedTime">—</div>
+    </div>
+
+    <div class="section">
+      <span class="label">Credits Offered</span>
+      <div class="value" id="credits">—</div>
+    </div>
+
+    <div class="section">
+      <span class="label">Additional Message</span>
+      <div class="value" id="message">—</div>
+    </div>
+  </div>
+
+  <div>
+    <button class="accept">Accept</button>
+    <button class="reject">Reject</button>
+    <button class="back-btn" onclick="window.history.back()">Back</button>
+  </div>
+</div>
+
+<footer>
+  © 2025 SkillSwap+. All Rights Reserved.
+</footer>
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  Timestamp
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+// UI Elements
+const studentNameEl = document.getElementById("studentName");
+const skillNameEl = document.getElementById("skillName");
+const requestedTimeEl = document.getElementById("requestedTime");
+const messageEl = document.getElementById("message");
+
+// From URL
+const requestID = new URLSearchParams(window.location.search).get("id");
+
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return location.href = "login.html";
+
+  if (!requestID) {
+    alert("Invalid request!");
+    return;
+  }
+
+  await loadRequest(requestID, user.uid);
+});
+
+// Load Request Details 🔥
+async function loadRequest(id, mentorUID) {
+  const reqRef = doc(db, "requests", id);
+  const snap = await getDoc(reqRef);
+
+  if (!snap.exists()) return alert("Request not found!");
+
+  const req = snap.data();
+
+  if (req.mentorUID !== mentorUID) {
+    alert("⚠ Unauthorized access!");
+    return location.href = "mentor_dashboard.html";
+  }
+
+  // Load student name from users collection
+  const studentSnap = await getDoc(doc(db, "users", req.studentUID));
+  studentNameEl.textContent = studentSnap.exists() ? studentSnap.data().name : "Unknown";
+
+  // Show request fields
+  skillNameEl.textContent = req.topic;
+  requestedTimeEl.textContent = req.time
+    ? new Date(req.time).toLocaleString()
+    : "Not given";
+
+  messageEl.textContent = req.message || "—";
+
+  // Button actions
+  document.querySelector(".accept").onclick = () => updateStatus(id, "accepted");
+  document.querySelector(".reject").onclick = () => updateStatus(id, "rejected");
+}
+
+// Accept / Reject 🔥
+async function updateStatus(id, status) {
+  await updateDoc(doc(db, "requests", id), {
+    status,
+    updatedAt: Timestamp.now()
+  });
+
+  alert(`Request ${status}!`);
+  location.href = "requests.html"; // back to mentor request list
+}
+</script>
+</body>
+</html>

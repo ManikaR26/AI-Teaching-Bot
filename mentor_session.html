@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Your Sessions • SkillSwap+</title>
+<style>
+body { font-family: Poppins, sans-serif; padding:20px; background:#f4f5f7; }
+.container { max-width:1000px; margin:auto; }
+.box {
+  background:white; padding:20px; border-radius:10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.1); margin-top:15px;
+}
+.session { padding:12px; border-bottom:1px solid #eee; cursor:pointer; }
+.session:hover { background:#eef3ff; }
+
+.btn {
+  padding:10px 16px; border:none; border-radius:6px;
+  font-size:14px; cursor:pointer; color:white;
+}
+.complete { background:#2d89ef; }
+
+h3 { margin-top:0; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Your Upcoming Sessions</h2>
+<p>Accepted sessions with students</p>
+
+<div class="box">
+  <div id="sessionsContainer">Loading...</div>
+</div>
+
+<div class="box">
+  <h3>Session Details</h3>
+  <p id="selectedSessionText">Select a confirmed session</p>
+  <button class="btn complete" id="completeSessionBtn">Mark as Completed</button>
+</div>
+
+<br>
+<button class="btn" style="background:#666" onclick="location.href='mentor_dashboard.html'">
+← Back to Dashboard
+</button>
+
+</div>
+
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import { collection, query, where, getDocs, updateDoc, doc }
+from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+let list = [];
+let selected = null;
+
+auth.onAuthStateChanged(async(user)=>{
+  if(!user) return location.href = "login.html";
+  loadSessions(user.uid);
+});
+
+// Load Accepted Sessions
+async function loadSessions(mentorId){
+  const q = query(collection(db,"sessionRequests"),
+      where("mentorId","==",mentorId),
+      where("status","==","accepted"));
+
+  const snap = await getDocs(q);
+  const container = document.getElementById("sessionsContainer");
+  container.innerHTML = "";
+
+  if(snap.empty){
+    container.innerHTML = `<p>No booked sessions yet.</p>`;
+    return;
+  }
+
+  snap.forEach(d=>{
+    const s = { id:d.id, ...d.data() };
+    list.push(s);
+
+    const div = document.createElement("div");
+    div.className="session";
+    div.innerHTML = `
+      ${s.skillName} <br>
+      <small>Student: ${s.studentName}</small>
+    `;
+    div.onclick = ()=> select(s);
+    container.appendChild(div);
+  });
+}
+
+function select(s){
+  selected = s;
+  document.getElementById("selectedSessionText").innerHTML = `
+    <strong>${s.skillName}</strong><br>
+    Student: ${s.studentName}<br>
+    Status: Accepted ✔<br>
+    <small>Session ID: ${s.id}</small>
+  `;
+}
+
+// Mark Completed
+document.getElementById("completeSessionBtn").onclick = async()=>{
+  if(!selected) return alert("Select a session first!");
+
+  await updateDoc(doc(db,"sessionRequests",selected.id), {
+    status:"completed"
+  });
+
+  alert("Session marked as completed!");
+  location.reload();
+};
+</script>
+
+</body>
+</html>

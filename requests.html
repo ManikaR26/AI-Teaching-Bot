@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Incoming Requests — SkillSwap+</title>
+
+<style>
+  body { margin:0; font-family: Inter, sans-serif; background:#f4f5f7; padding:28px; display:flex; justify-content:center; }
+  .wrap { width:100%; max-width:900px; }
+  header h1 { margin:0; font-size:22px; font-weight:600; }
+  header p { margin:4px 0; font-size:13px; color:#666; }
+
+  .panel { background:#fff; padding:20px; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.06); }
+
+  .grid { display:grid; grid-template-columns: 330px 1fr; gap:18px; }
+  @media(max-width:850px){ .grid{grid-template-columns:1fr} }
+
+  .list { max-height:500px; overflow:auto; display:flex; flex-direction:column; gap:10px; }
+  .req-card { background:#fafcff; border:1px solid #eee; border-radius:10px; padding:12px; cursor:pointer; }
+  .req-card:hover { background:#e8f2ff; }
+
+  .title { font-weight:600; font-size:14px; margin-bottom:4px; }
+  .small { font-size:12px; color:#555; }
+
+  .detail { background:#fff; border:1px solid #eee; border-radius:10px; padding:20px; min-height:300px; }
+  .detail h3 { margin-top:0; font-size:18px; }
+
+  .actions { margin-top:25px; display:flex; gap:10px; }
+  button { padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:14px; }
+  .accept { background:#10b981; color:white; }
+  .reject { background:#ef4444; color:white; }
+  button:disabled { background:#ccc; cursor:not-allowed; }
+</style>
+
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Incoming Requests</h1>
+    <p>Students requesting sessions from you</p>
+  </header>
+
+  <div class="panel">
+    <div class="grid">
+
+      <div><div class="list" id="reqList"></div></div>
+
+      <div class="detail" id="detailBox">
+        <h3 id="dTitle">Select a request</h3>
+        <p id="dStudent" class="small">—</p>
+        <p id="dTime" class="small"></p>
+        <p id="dMessage" class="small"></p>
+
+        <div class="actions">
+          <button class="accept" id="acceptBtn" disabled>Accept</button>
+          <button class="reject" id="rejectBtn" disabled>Reject</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  doc, getDoc, updateDoc,
+  onSnapshot, query, where,
+  collection, addDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+let currentReqID = null;
+
+// UI
+const listBox = document.getElementById("reqList");
+const dTitle = document.getElementById("dTitle");
+const dStudent = document.getElementById("dStudent");
+const dTime = document.getElementById("dTime");
+const dMessage = document.getElementById("dMessage");
+const acceptBtn = document.getElementById("acceptBtn");
+const rejectBtn = document.getElementById("rejectBtn");
+
+// Auth check
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return (location.href = "login.html");
+
+  const userDoc = await getDoc(doc(db, "users", user.uid));
+  if (!userDoc.exists() || userDoc.data().role !== "mentor") {
+    alert("Mentor access only!");
+    return (location.href = "student_dashboard.html");
+  }
+
+  loadRequests(user.uid);
+});
+
+// Load Requests Live 🔥
+function loadRequests(mentorUID) {
+  const q = query(collection(db, "requests"),
+    where("mentorUID", "==", mentorUID),
+    where("status", "==", "pending")
+  );
+
+  onSnapshot(q, async (snapshot) => {
+    listBox.innerHTML = "";
+    clearDetails();
+
+    if (snapshot.empty) {
+      listBox.innerHTML = `<p class="small">No new requests</p>`;
+      return;
+    }
+
+    snapshot.forEach(async (docSnap) => {
+      const req = docSnap.data();
+      const id = docSnap.id;
+
+      // Fetch student name
+      const studentDoc = await getDoc(doc(db, "users", req.studentUID));
+      const studentName = studentDoc.exists() ? studentDoc.data().name : "Anonymous";
+
+      const div = document.createElement("div");
+      div.className = "req-card";
+      div.innerHTML = `
+        <div class="title">${req.topic}</div>
+        <div class="small">Student: ${studentName}</div>
+        <div class="small">${new Date(req.time).toLocaleString()}</div>
+      `;
+
+      div.onclick = () => showDetails(id, req, studentName);
+      listBox.appendChild(div);
+    });
+  });
+}
+
+// Show Details
+function showDetails(id, req, studentName) {
+  currentReqID = id;
+  dTitle.textContent = req.topic;
+  dStudent.textContent = "Student: " + studentName;
+  dTime.textContent = "Requested: " + new Date(req.time).toLocaleString();
+  dMessage.textContent = "Message: " + (req.message || "—");
+  acceptBtn.disabled = false;
+  rejectBtn.disabled = false;
+}
+
+// Reset
+function clearDetails() {
+  currentReqID = null;
+  dTitle.textContent = "Select a request";
+  dStudent.textContent = "—";
+  dTime.textContent = "";
+  dMessage.textContent = "";
+  acceptBtn.disabled = true;
+  rejectBtn.disabled = true;
+}
+
+// ACCEPT — Create Live Session
+acceptBtn.onclick = async () => {
+  const reqRef = doc(db, "requests", currentReqID);
+  const reqSnap = await getDoc(reqRef);
+
+  if (!reqSnap.exists()) return alert("Request not found!");
+
+  const req = reqSnap.data();
+
+  await addDoc(collection(db, "sessions"), {
+    mentorId: req.mentorUID,
+    studentId: req.studentUID,
+    mentorName: req.mentorName,
+    studentName: req.studentName,
+    topic: req.skillTitle || "Session",
+    timestamp: req.time ? new Date(req.time) : new Date(),
+    status: "confirmed",
+    format: "live",
+    meetLink: "https://meet.google.com/test-demo",
+    createdAt: new Date()
+  });
+
+  await updateDoc(reqRef, { status: "accepted" });
+
+  alert("Session Accepted & Scheduled!");
+  clearDetails();
+};
+
+
+// REJECT
+rejectBtn.onclick = async () => {
+  await updateDoc(doc(db, "requests", currentReqID), { status: "rejected" });
+  alert("Request Rejected!");
+  clearDetails();
+};
+</script>
+
+</body>
+</html>

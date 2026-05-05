@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Session Request • SkillSwap+</title>
+
+<style>
+  body { margin: 0; font-family: Poppins, sans-serif; background: #f4f5f7; }
+  header { background: #2d89ef; color: white; text-align: center; padding: 18px; font-size: 22px; font-weight: 600; }
+  .container {
+    max-width: 700px; background: #fff; margin: 30px auto;
+    padding: 25px; border-radius: 12px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.07);
+  }
+  h2 { text-align: center; color: #333; margin-bottom: 25px; }
+  label { font-size: 14px; font-weight: 600; margin-bottom: 6px; display: block; color: #444; }
+  select, input, textarea {
+    width: 100%; padding: 12px; margin-bottom: 15px;
+    border-radius: 8px; border: 1px solid #ddd;
+    background: #fafafa; font-size: 14px;
+  }
+  textarea { height: 90px; resize: vertical; }
+  button {
+    width: 100%; background: #2d89ef; color: white;
+    padding: 12px; border-radius: 8px; border: none;
+    cursor: pointer; font-weight: 600; font-size: 15px;
+    margin-top: 10px;
+  }
+  button:hover { background: #1664c4; }
+</style>
+</head>
+
+<body>
+
+<header>Create Session Request</header>
+
+<div class="container">
+  <h2>Request a Mentoring Session</h2>
+
+  <label>Choose Mentor</label>
+  <select id="mentorSelect" required>
+    <option disabled selected>Select Mentor...</option>
+  </select>
+
+  <label>Choose Skill</label>
+  <select id="skillSelect" disabled>
+    <option disabled>Select a mentor first</option>
+  </select>
+
+  <label>Preferred Date & Time</label>
+  <input type="datetime-local" id="timeInput" required>
+
+  <label>Message (optional)</label>
+  <textarea id="messageInput" placeholder="Write a short note for mentor..."></textarea>
+
+  <button id="submitBtn">Send Request</button>
+</div>
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  addDoc, collection, doc, getDoc, getDocs, query, where
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+const mentorSelect = document.getElementById("mentorSelect");
+const skillSelect = document.getElementById("skillSelect");
+let selectedMentorUID = null;
+
+// Ensure login
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return location.href = "login.html";
+  loadMentors();
+});
+
+// Load mentors list
+async function loadMentors() {
+  const q = query(collection(db, "users"), where("role", "==", "mentor"));
+  const snap = await getDocs(q);
+
+  snap.forEach(docSnap => {
+    const data = docSnap.data();
+    const option = document.createElement("option");
+    option.value = docSnap.id;
+    option.textContent = data.name || "Mentor";
+    mentorSelect.appendChild(option);
+  });
+}
+
+// Load skills when mentor selected
+mentorSelect.addEventListener("change", async () => {
+  selectedMentorUID = mentorSelect.value;
+  loadSkillsForMentor(selectedMentorUID);
+});
+
+// Fetch mentor skills
+async function loadSkillsForMentor(mentorUID) {
+  skillSelect.innerHTML = "<option>Loading...</option>";
+
+  const q = query(collection(db, "skills"), where("ownerId", "==", mentorUID));
+  const snap = await getDocs(q);
+
+  skillSelect.innerHTML = "";
+
+  if (snap.empty) {
+    skillSelect.innerHTML = "<option>No skills available</option>";
+    skillSelect.disabled = true;
+    return;
+  }
+
+  snap.forEach(docSnap => {
+    const skill = docSnap.data();
+    const option = document.createElement("option");
+    option.value = skill.title;
+    option.textContent = skill.title;
+    skillSelect.appendChild(option);
+  });
+
+  skillSelect.disabled = false;
+}
+
+// Submit request
+document.getElementById("submitBtn").addEventListener("click", async () => {
+  const user = auth.currentUser;
+  if (!user) return alert("Login required!");
+
+  const selectedSkill = skillSelect.value;
+  const time = document.getElementById("timeInput").value;
+  const message = document.getElementById("messageInput").value.trim();
+
+  if (!selectedMentorUID || !selectedSkill || !time)
+    return alert("Please fill all required fields.");
+
+  try {
+    // Fetch User Names
+    const studentDoc = await getDoc(doc(db, "users", user.uid));
+    const mentorDoc = await getDoc(doc(db, "users", selectedMentorUID));
+
+    await addDoc(collection(db, "requests"), {
+      mentorUID: selectedMentorUID,
+      mentorName: mentorDoc.data().name || "",
+      studentUID: user.uid,
+      studentName: studentDoc.data().name || "",
+      skillTitle: selectedSkill,
+      time,
+      message,
+      status: "pending",
+      createdAt: new Date()
+    });
+
+    alert("Request sent successfully!");
+    location.href = "student_dashboard.html";
+
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+});
+</script>
+
+</body>
+</html>

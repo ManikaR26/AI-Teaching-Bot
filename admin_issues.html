@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin – Issue Center | SkillSwap+</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:0; background:#eef3fa; }
+
+  header {
+    background:#2d89ef;
+    padding:18px;
+    color:white;
+    font-size:22px;
+    font-weight:600;
+    text-align:center;
+  }
+
+  .container {
+    max-width:1000px;
+    margin:30px auto;
+    padding:0 20px;
+  }
+
+  h2 {
+    margin:10px 0 20px;
+    color:#222;
+    text-align:center;
+  }
+
+  .issue-card {
+    background:white;
+    border-radius:12px;
+    padding:18px;
+    margin-bottom:15px;
+    box-shadow:0 3px 10px rgba(0,0,0,0.08);
+  }
+
+  .user { font-size:14px; color:#444; }
+  .text { margin:10px 0; font-size:16px; color:#111; white-space:pre-wrap; }
+
+  .status {
+    display:inline-block;
+    padding:5px 10px;
+    border-radius:8px;
+    font-size:12px;
+    font-weight:bold;
+    margin-bottom:10px;
+  }
+  .pending { background:#ffe5b5; color:#c67b00; }
+  .solved { background:#c6f6d5; color:#1b7a31; }
+
+  button {
+    padding:8px 14px;
+    border:none;
+    border-radius:6px;
+    font-size:14px;
+    cursor:pointer;
+    margin-right:8px;
+  }
+  .solve-btn { background:#38a169; color:white; }
+  .solve-btn:hover { background:#2f8a57; }
+  .delete-btn { background:#e53e3e; color:white; }
+  .delete-btn:hover { background:#c53030; }
+
+  footer {
+    text-align:center;
+    margin-top:40px;
+    padding:20px;
+    color:#777;
+    font-size:14px;
+  }
+</style>
+</head>
+<body>
+
+<header>Admin Issue Center</header>
+
+<div class="container">
+  <h2>Reported Issues</h2>
+
+  <div id="issueList">Loading issues...</div>
+</div>
+
+<footer>© 2025 SkillSwap+. Admin Panel</footer>
+
+
+<!-- Firebase -->
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  doc, getDoc, updateDoc, deleteDoc, collection,
+  query, orderBy, onSnapshot
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+const issueList = document.getElementById("issueList");
+
+// AUTH GUARD
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return location.href = "login.html";
+
+  const userRef = await getDoc(doc(db, "users", user.uid));
+  if (!userRef.exists() || userRef.data().role !== "admin") {
+    alert("Access denied! Admins only.");
+    return location.href = "student_dashboard.html";
+  }
+
+  loadIssues();
+});
+
+// LIVE ISSUE FETCHING
+function loadIssues() {
+  issueList.innerHTML = "Loading...";
+
+  const q = query(collection(db, "issues"), orderBy("createdAt", "desc"));
+
+  onSnapshot(q, (snapshot) => {
+    if (snapshot.empty) {
+      issueList.innerHTML = "<p>No issues reported 🙂</p>";
+      return;
+    }
+
+    issueList.innerHTML = "";
+
+    snapshot.forEach((docSnap) => {
+      const issue = docSnap.data();
+      const id = docSnap.id;
+
+      const card = document.createElement("div");
+      card.className = "issue-card";
+      const statusClass = issue.status === "pending" ? "pending" : "solved";
+
+      const time = issue.createdAt?.toDate
+        ? issue.createdAt.toDate().toLocaleString()
+        : "—";
+
+      card.innerHTML = `
+        <div class="status ${statusClass}">${issue.status.toUpperCase()}</div>
+        <div class="user"><b>User:</b> ${issue.userId}</div>
+        <div class="text">${issue.text}</div>
+        <div class="user"><b>Time:</b> ${time}</div>
+
+        <div style="margin-top:10px;">
+          ${
+            issue.status === "pending"
+              ? `<button class='solve-btn' data-id='${id}'>Mark Solved</button>`
+              : ""
+          }
+          <button class="delete-btn" data-id='${id}'>Delete</button>
+        </div>
+      `;
+
+      issueList.appendChild(card);
+    });
+
+    attachButtons();
+  });
+}
+
+// BUTTON LOGIC
+function attachButtons() {
+  document.querySelectorAll(".solve-btn")?.forEach(btn => {
+    btn.addEventListener("click", () => markSolved(btn.dataset.id));
+  });
+
+  document.querySelectorAll(".delete-btn")?.forEach(btn => {
+    btn.addEventListener("click", () => deleteIssue(btn.dataset.id));
+  });
+}
+
+async function markSolved(id) {
+  await updateDoc(doc(db, "issues", id), { status: "solved" });
+}
+
+async function deleteIssue(id) {
+  if (confirm("Delete issue permanently?")) {
+    await deleteDoc(doc(db, "issues", id));
+  }
+}
+</script>
+
+</body>
+</html>

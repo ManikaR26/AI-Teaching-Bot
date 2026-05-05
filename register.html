@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SkillSwap+ — Register</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f4f4f6;
+      color: #222;
+      margin: 0;
+    }
+
+    .wrap {
+      max-width: 520px;
+      margin: 48px auto;
+      background: white;
+      padding: 22px;
+      border-radius: 8px;
+      box-shadow: 0 6px 18px rgba(30,30,40,0.06);
+    }
+
+    h1 { margin: 0 0 8px; font-size: 20px; }
+    p.lead { color: #666; font-size: 14px; margin: 0 0 18px; }
+
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+
+    .roles {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .role {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+    }
+
+    button {
+      background: #2d89ef;
+      color: white;
+      border: 0;
+      padding: 10px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .error {
+      color: #b00020;
+      font-size: 13px;
+      margin: -8px 0 12px;
+      display: none;
+    }
+
+    .footer-cta {
+      text-align: center;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    @media (max-width:480px){ .wrap{margin:20px;} .roles{flex-direction:column;} }
+  </style>
+</head>
+<body>
+
+  <div class="wrap">
+    <h1>Create your SkillSwap+ account</h1>
+    <p class="lead">Choose whether you want to learn or teach.</p>
+
+    <form id="registerForm">
+
+      <label for="name">Full name</label>
+      <input id="name" type="text" placeholder="e.g., Priya Sharma" required />
+
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="you@example.com" required />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="Min. 6 characters" required minlength="6" />
+
+      <label>Role</label>
+      <div class="roles">
+        <label class="role"><input type="radio" name="role" value="student" checked /> Student</label>
+        <label class="role"><input type="radio" name="role" value="mentor" /> Mentor</label>
+      </div>
+
+      <label for="skills">Skills / Interests</label>
+      <input id="skills" type="text" placeholder="React, DSA, Guitar..." />
+
+      <div class="error" id="error"></div>
+
+      <button type="submit">Create Account</button>
+
+      <div class="footer-cta">
+        <small>Already have an account? <a href="login.html" style="color:#2d89ef">Login</a></small>
+      </div>
+    </form>
+  </div>
+
+<!-- ✅ ONLY this Firebase script allowed -->
+<script type="module">
+import { 
+  auth, db,
+  createUserWithEmailAndPassword,
+  doc, setDoc 
+} from "./firebase.js";
+
+document.getElementById("registerForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const name = document.getElementById("name").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const skillsInput = document.getElementById("skills").value.trim();
+  const errorEl = document.getElementById("error");
+
+  const role = document.querySelector("input[name='role']:checked").value;
+
+  const skills = skillsInput
+    ? skillsInput.split(",").map(s => s.trim())
+    : [];
+
+  try {
+    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    const uid = userCred.user.uid;
+
+    await setDoc(doc(db, "users", uid), {
+      uid,
+      name,
+      email,
+      role,
+      skills,
+      walletBalance: 200,   // 🔥 Correct key name for wallet
+      photoURL: "",         // 🔥 Reserved for profile image
+      createdAt: new Date().toISOString()
+    });
+
+    alert("Account Created Successfully! 🎉");
+
+    if(role === "mentor") {
+      window.location.href = "mentor_dashboard.html";
+    } else {
+      window.location.href = "student_dashboard.html";
+    }
+
+  } catch (error) {
+    console.error(error);
+    errorEl.textContent = error.message;
+    errorEl.style.display = "block";
+  }
+});
+</script>
+</body>
+</html>

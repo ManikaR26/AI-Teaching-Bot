@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SkillSwap+ | Mentor Chat</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Top buttons */
+    .top-btn {
+      position: absolute;
+      top: 10px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      color: #fff;
+      z-index: 20;
+    }
+    .dash-btn { left: 10px; background: #2d89ef; }
+    .logout-btn { right: 10px; background: #e63946; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 28%;
+      background: #fff;
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+    }
+    .sidebar-header {
+      background: #2d89ef;
+      color: white;
+      padding: 15px;
+      font-size: 18px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .student-item {
+      padding: 12px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+    .student-left {
+      display: flex;
+      flex-direction: column;
+    }
+    .student-name {
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+    }
+    .student-lastmsg {
+      font-size: 12px;
+      color: #777;
+    }
+    .student-item:hover {
+      background: #f7f9fc;
+    }
+    .status-pill {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .status-online {
+      color: #15803d;
+      background: #dcfce7;
+      border-color: #22c55e55;
+    }
+    .status-offline {
+      color: #6b7280;
+      background: #e5e7eb;
+      border-color: #d4d4d8;
+    }
+
+    /* Chat main */
+    .chat {
+      width: 72%;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-header {
+      padding: 15px;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chat-header-left {
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-header h3 {
+      margin: 0;
+      font-size: 16px;
+      color: #333;
+    }
+    .chat-header span {
+      font-size: 12px;
+    }
+
+    /* Messages */
+    .messages {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background: #e5ebf1;
+    }
+    .msg {
+      max-width: 70%;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      border-radius: 14px;
+      line-height: 1.4;
+      font-size: 14px;
+    }
+    .sent {
+      background: #2d89ef;
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 2px;
+    }
+    .received {
+      background: white;
+      color: #333;
+      margin-right: auto;
+      border-bottom-left-radius: 2px;
+      border: 1px solid #ddd;
+    }
+    .msg-sender {
+      font-size: 11px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      opacity: 0.9;
+    }
+    .msg-time {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    /* Input */
+    .input-area {
+      display: flex;
+      padding: 12px;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      gap: 10px;
+    }
+    .input-area input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 25px;
+      outline: none;
+      font-size: 14px;
+    }
+    .send-btn {
+      background: #2d89ef;
+      border: none;
+      padding: 0 20px;
+      border-radius: 25px;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .send-btn:hover {
+      background: #1b6edc;
+    }
+  </style>
+</head>
+<body>
+
+<button class="top-btn dash-btn" id="dashBtn">← Dashboard</button>
+<button class="top-btn logout-btn" id="logoutBtn">Logout</button>
+
+<div class="sidebar">
+  <div class="sidebar-header">Your Students</div>
+  <div id="studentList"></div>
+</div>
+
+<div class="chat">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <h3 id="chatWithName">Select a student</h3>
+      <span id="chatWithStatus">—</span>
+    </div>
+  </div>
+
+  <div class="messages" id="messagesBox">
+    <div class="msg received">
+      <div class="msg-sender">System</div>
+      <div>Select a student from the left to start chatting.</div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <input id="msgInput" placeholder="Type a message..." />
+    <button class="send-btn" id="sendBtn">Send</button>
+  </div>
+</div>
+
+<script type="module">
+  import { auth, db } from "./firebase.js";
+  import {
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    query,
+    where,
+    orderBy,
+    addDoc,
+    onSnapshot,
+    serverTimestamp,
+    setDoc
+  } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+  const studentListEl   = document.getElementById("studentList");
+  const messagesBox     = document.getElementById("messagesBox");
+  const chatWithNameEl  = document.getElementById("chatWithName");
+  const chatWithStatusEl= document.getElementById("chatWithStatus");
+  const msgInput        = document.getElementById("msgInput");
+  const sendBtn         = document.getElementById("sendBtn");
+  const dashBtn         = document.getElementById("dashBtn");
+  const logoutBtn       = document.getElementById("logoutBtn");
+
+  let currentMentorId = null;
+  let currentMentorName = "You";
+  let currentStudentId = null;
+  let currentStudentName = "";
+  let unsubscribeMessages = null;
+
+  // -------- Auth Guard (mentor only) ----------
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    currentMentorId = user.uid;
+
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      window.location.href = "login.html";
+      return;
+    }
+    const data = userSnap.data();
+    currentMentorName = data.name || "You";
+
+    if (data.role !== "mentor") {
+      alert("Access denied! Only mentors can use this page.");
+      if (data.role === "student") window.location.href = "student_dashboard.html";
+      else window.location.href = "index.html";
+      return;
+    }
+
+    // mark presence
+    updatePresence();
+    setInterval(updatePresence, 60 * 1000);
+
+    loadStudents();
+  });
+
+  async function updatePresence() {
+    if (!currentMentorId) return;
+    const ref = doc(db, "users", currentMentorId);
+    await setDoc(ref, { lastActive: serverTimestamp() }, { merge: true });
+  }
+
+  // -------- Load all students ----------
+  async function loadStudents() {
+    studentListEl.innerHTML = "Loading students...";
+
+    try {
+      const q = query(collection(db, "users"), where("role", "==", "student"));
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        studentListEl.innerHTML = "<p style='padding:10px;color:#777;font-size:13px;'>No students found.</p>";
+        return;
+      }
+
+      studentListEl.innerHTML = "";
+      const now = new Date();
+
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const studentId = docSnap.id;
+        const name = data.name || "Student";
+
+        let statusText = "Offline";
+        let statusClass = "status-offline";
+
+        if (data.lastActive && data.lastActive.toDate) {
+          const last = data.lastActive.toDate();
+          const diffMs = now - last;
+          const twoMinutes = 2 * 60 * 1000;
+          if (diffMs <= twoMinutes) {
+            statusText = "Online";
+            statusClass = "status-online";
+          }
+        }
+
+        const item = document.createElement("div");
+        item.className = "student-item";
+
+        const left = document.createElement("div");
+        left.className = "student-left";
+        const nm = document.createElement("div");
+        nm.className = "student-name";
+        nm.textContent = name;
+        const lastMsg = document.createElement("div");
+        lastMsg.className = "student-lastmsg";
+        lastMsg.textContent = "Tap to chat";
+        left.appendChild(nm);
+        left.appendChild(lastMsg);
+
+        const status = document.createElement("span");
+        status.className = "status-pill " + statusClass;
+        status.textContent = statusText;
+
+        item.appendChild(left);
+        item.appendChild(status);
+
+        item.addEventListener("click", () => {
+          openChat(studentId, name, lastMsg);
+        });
+
+        studentListEl.appendChild(item);
+
+        // load last message preview
+        loadLastMessagePreview(studentId, lastMsg);
+      });
+    } catch (err) {
+      console.error(err);
+      studentListEl.innerHTML = "<p style='padding:10px;color:#777;font-size:13px;'>Error loading students.</p>";
+    }
+  }
+
+  function getChatId(uid1, uid2) {
+    return [uid1, uid2].sort().join("_");
+  }
+
+  async function loadLastMessagePreview(studentId, labelEl) {
+    if (!currentMentorId) return;
+    const chatId = getChatId(currentMentorId, studentId);
+    try {
+      const q = query(
+        collection(db, "chats", chatId, "messages"),
+        orderBy("timestamp", "desc")
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const msg = snap.docs[0].data();
+        const from = msg.from === currentMentorId ? "You" : "Them";
+        const text = msg.text || "";
+        labelEl.textContent = from + ": " + text.slice(0, 40) + (text.length > 40 ? "..." : "");
+      } else {
+        labelEl.textContent = "No messages yet";
+      }
+    } catch (e) {
+      labelEl.textContent = "Tap to chat";
+    }
+  }
+
+  // -------- Open chat with selected student ----------
+  function openChat(studentId, name, labelEl) {
+    if (!currentMentorId) return;
+    currentStudentId = studentId;
+    currentStudentName = name;
+
+    chatWithNameEl.textContent = name;
+    chatWithStatusEl.textContent = "Chatting as mentor";
+
+    messagesBox.innerHTML = `
+      <div class="msg received">
+        <div class="msg-sender">${name}</div>
+        <div>Loading messages...</div>
+      </div>
+    `;
+
+    if (unsubscribeMessages) unsubscribeMessages();
+
+    const chatId = getChatId(currentMentorId, currentStudentId);
+    const q = query(
+      collection(db, "chats", chatId, "messages"),
+      orderBy("timestamp", "asc")
+    );
+
+    unsubscribeMessages = onSnapshot(q, (snapshot) => {
+      messagesBox.innerHTML = "";
+      snapshot.forEach(docSnap => {
+        const msg = docSnap.data();
+        const isMe = msg.from === currentMentorId;
+
+        const div = document.createElement("div");
+        div.className = "msg " + (isMe ? "sent" : "received");
+
+        const senderName = msg.fromName || (isMe ? currentMentorName : currentStudentName);
+        let timeText = "";
+        if (msg.timestamp && msg.timestamp.toDate) {
+          const d = msg.timestamp.toDate();
+          timeText = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+        }
+
+        div.innerHTML = `
+          <div class="msg-sender">${senderName}</div>
+          <div>${msg.text || ""}</div>
+          <div class="msg-time">${timeText}</div>
+        `;
+        messagesBox.appendChild(div);
+      });
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+
+      // sidebar preview update
+      if (labelEl && snapshot.docs.length > 0) {
+        const lastMsg = snapshot.docs[snapshot.docs.length - 1].data();
+        const from = lastMsg.from === currentMentorId ? "You" : name.split(" ")[0] || "Them";
+        const text = lastMsg.text || "";
+        labelEl.textContent = from + ": " + text.slice(0, 40) + (text.length > 40 ? "..." : "");
+      }
+    });
+  }
+
+  // -------- Send message ----------
+  async function sendMessage() {
+    const text = msgInput.value.trim();
+    if (!text || !currentStudentId || !currentMentorId) return;
+
+    const chatId = getChatId(currentMentorId, currentStudentId);
+    const messagesRef = collection(db, "chats", chatId, "messages");
+
+    const messageData = {
+      from: currentMentorId,
+      fromName: currentMentorName,
+      text,
+      timestamp: serverTimestamp()
+    };
+
+    try {
+      await addDoc(messagesRef, messageData);
+      msgInput.value = "";
+      updatePresence();
+    } catch (err) {
+      console.error(err);
+      alert("Message not sent. Please try again.");
+    }
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  msgInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // -------- Dashboard + Logout buttons ----------
+  dashBtn.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user) return (window.location.href = "login.html");
+
+    const snap = await getDoc(doc(db, "users", user.uid));
+    if (!snap.exists()) return (window.location.href = "index.html");
+
+    const role = snap.data().role;
+    if (role === "mentor") window.location.href = "mentor_dashboard.html";
+    else if (role === "student") window.location.href = "student_dashboard.html";
+    else window.location.href = "index.html";
+  });
+
+  logoutBtn.addEventListener("click", async () => {
+    await auth.signOut();
+    window.location.href = "login.html";
+  });
+</script>
+
+</body>
+</html>

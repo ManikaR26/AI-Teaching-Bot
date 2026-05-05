@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings – SkillSwap</title>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50">
+
+<!-- ================= NAVBAR ================= -->
+<nav class="bg-white shadow-md p-4 fixed top-0 left-0 w-full z-50">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+
+        <div class="text-2xl font-semibold text-blue-600">
+            SkillSwap
+        </div>
+
+        <div class="space-x-6 text-gray-600 font-medium">
+            <a href="dashboard.html" class="hover:text-blue-600">Dashboard</a>
+            <a href="profile.html" class="hover:text-blue-600">Profile</a>
+            <a href="wallet.html" class="hover:text-blue-600">Wallet</a>
+            <a href="reviews.html" class="hover:text-blue-600">Reviews</a>
+            <a href="settings.html" class="text-blue-600 font-semibold underline">Settings</a>
+        </div>
+
+    </div>
+</nav>
+
+<!-- navbar ke neeche spacing -->
+<div class="mt-24"></div>
+
+
+
+<!-- ================= MAIN CONTENT ================= -->
+<div class="max-w-5xl mx-auto bg-white shadow-md rounded-2xl p-10">
+
+    <!-- ACCOUNT SETTINGS -->
+    <h2 class="text-2xl font-bold text-gray-800 mb-8">Account Settings</h2>
+
+    <form class="space-y-6">
+
+        <div>
+            <label class="block text-gray-600 font-medium mb-1">Full Name</label>
+            <input type="text" placeholder="Your Name"
+                class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+        </div>
+
+        <div>
+            <label class="block text-gray-600 font-medium mb-1">Email</label>
+            <input type="email" placeholder="you@example.com"
+                class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+        </div>
+
+        <button type="submit"
+            class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+            Save Changes
+        </button>
+    </form>
+
+
+    <!-- DIVIDER -->
+    <div class="my-12 border-b border-gray-300"></div>
+
+
+    <!-- PASSWORD SECTION -->
+    <h2 class="text-2xl font-bold text-gray-800 mb-8">Change Password</h2>
+
+    <form class="space-y-6">
+
+        <div>
+            <label class="block text-gray-600 font-medium mb-1">Current Password</label>
+            <input type="password" class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div>
+            <label class="block text-gray-600 font-medium mb-1">New Password</label>
+            <input type="password" class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div>
+            <label class="block text-gray-600 font-medium mb-1">Confirm New Password</label>
+            <input type="password" class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <button
+            class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition">
+            Update Password
+        </button>
+
+    </form>
+
+</div>
+<script type="module">
+import { auth, db } from "./firebase.js";
+import {
+  updateEmail, updatePassword, EmailAuthProvider,
+  reauthenticateWithCredential
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-auth.js";
+import {
+  doc, getDoc, updateDoc
+} from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+// DOM Elements
+const nameInput = document.querySelector('input[type="text"]');
+const emailInput = document.querySelector('input[type="email"]');
+const currentPass = document.querySelectorAll('input[type="password"]')[0];
+const newPass = document.querySelectorAll('input[type="password"]')[1];
+const confirmPass = document.querySelectorAll('input[type="password"]')[2];
+
+let loggedUser = null;
+
+// Load user details
+auth.onAuthStateChanged(async (user) => {
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  loggedUser = user;
+  emailInput.value = user.email;
+
+  const ref = doc(db, "users", user.uid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    nameInput.value = snap.data().name || "";
+  }
+});
+
+// Save Name + Email
+document.querySelector('button[type="submit"]').addEventListener("click", async (e) => {
+  e.preventDefault();
+  if (!loggedUser) return;
+
+  const newName = nameInput.value.trim();
+  const newEmail = emailInput.value.trim();
+
+  try {
+    await updateDoc(doc(db, "users", loggedUser.uid), { name: newName });
+
+    if (newEmail !== loggedUser.email) {
+      const pass = prompt("Please re-enter your password to continue");
+      const cred = EmailAuthProvider.credential(loggedUser.email, pass);
+
+      await reauthenticateWithCredential(loggedUser, cred);
+      await updateEmail(loggedUser, newEmail);
+    }
+
+    alert("Profile updated successfully!");
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+// Change Password
+document.querySelector('.bg-green-600').addEventListener("click", async (e) => {
+  e.preventDefault();
+  if (!loggedUser) return;
+
+  if (!currentPass.value || !newPass.value) {
+    return alert("Please fill all fields!");
+  }
+  if (newPass.value !== confirmPass.value) {
+    return alert("New passwords do not match!");
+  }
+
+  try {
+    const cred = EmailAuthProvider.credential(loggedUser.email, currentPass.value);
+    await reauthenticateWithCredential(loggedUser, cred);
+
+    await updatePassword(loggedUser, newPass.value);
+
+    alert("Password updated successfully!");
+    currentPass.value = newPass.value = confirmPass.value = "";
+  } catch (err) {
+    alert(err.message);
+  }
+});
+</script>
+
+</body>
+</html>

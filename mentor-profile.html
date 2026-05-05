@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mentor Profile • SkillSwap+</title>
+  <style>
+    body { margin:0; font-family: Poppins, sans-serif; background:#f4f5f7; }
+    header { background:#2d89ef;color:white;text-align:center;padding:15px;font-weight:600;font-size:22px; }
+
+    .container {
+      max-width:850px; margin:30px auto; background:white;
+      padding:25px; border-radius:10px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .center { text-align:center; }
+
+    .avatar {
+      width:120px; height:120px;
+      border-radius:50%;
+      margin:auto; display:block;
+      object-fit:cover;
+      background:#e6e6e6;
+    }
+
+    .name { font-size:22px; margin:10px 0; font-weight:600; }
+    .bio { font-size:15px; color:#444; margin-bottom:20px; }
+    h3 { margin-top:25px; color:#2d89ef; }
+
+    .skill-tag {
+      padding:6px 12px;
+      background:#e8f1ff;
+      color:#2d89ef;
+      border-radius:20px;
+      font-size:13px;
+      margin:6px;
+      display:inline-block;
+    }
+
+    .btn {
+      padding:8px 14px;
+      background:#2d89ef;
+      color:white;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:14px;
+      margin-top:8px;
+    }
+
+    .edit {
+      background:#16a34a;
+    }
+
+    .back-link { text-align:center; margin-top:25px; }
+    .back-link a { color:#2d89ef; text-decoration:none; font-size:14px; cursor:pointer; }
+
+    /* MODAL */
+    #editModal {
+      position:fixed; top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,.45);
+      display:none;
+      justify-content:center;
+      align-items:center;
+    }
+    .modal-box {
+      background:white; padding:20px; border-radius:10px; width:300px;
+      text-align:center;
+    }
+    .modal-box input, .modal-box textarea {
+      width:100%; padding:8px; margin:8px 0; font-size:14px;
+    }
+    .modal-actions button {
+      padding:8px 12px; border:none; border-radius:6px; cursor:pointer;
+      margin:8px 6px; font-size:14px;
+    }
+    .save-btn { background:#2d89ef; color:white; }
+    .cancel-btn { background:#ccc; color:black; }
+  </style>
+</head>
+<body>
+
+<header>Mentor Profile</header>
+
+<div class="container center">
+  <img id="mentorPhoto" class="avatar">
+
+  <div class="name" id="mentorName">Loading...</div>
+  <div class="bio" id="mentorBio">Fetching bio...</div>
+
+  <button class="btn edit" id="editBtn">Edit Profile</button>
+
+  <h3>Skills</h3>
+  <div id="skillsList">Loading...</div>
+
+  <h3>Student Reviews</h3>
+  <div id="reviewsList">No reviews yet.</div>
+
+  <div class="back-link">
+    <a id="backLink">← Back to Dashboard</a>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="editModal">
+  <div class="modal-box">
+    <h3>Edit Profile</h3>
+    <input id="editName" placeholder="Full Name">
+    <textarea id="editBio" placeholder="Bio"></textarea>
+    <input id="editPhoto" type="file" accept="image/*">
+
+    <div class="modal-actions">
+      <button class="save-btn" id="saveChanges">Save</button>
+      <button class="cancel-btn" id="closeModal">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+<script type="module">
+import { auth, db } from "./firebase.js";
+import { doc, getDoc, collection, query, where, getDocs, updateDoc }
+from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL }
+from "https://www.gstatic.com/firebasejs/9.6.11/firebase-storage.js";
+
+const params = new URLSearchParams(window.location.search);
+const mentorId = params.get("id");
+
+if (!mentorId) {
+  alert("Invalid access — Mentor not selected!");
+  location.href = "find_mentors.html";
+}
+
+const avatar = document.getElementById("mentorPhoto");
+const nameEl = document.getElementById("mentorName");
+const bioEl = document.getElementById("mentorBio");
+const skillsList = document.getElementById("skillsList");
+
+// LOGIN CHECK
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return location.href = "login.html";
+  loadMentorDetails();
+  loadSkills();
+});
+
+// GET PROFILE
+async function loadMentorDetails() {
+  const refDoc = doc(db, "users", mentorId);
+  const snap = await getDoc(refDoc);
+
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+  avatar.src = data.photo || `https://i.pravatar.cc/120?u=${mentorId}`;
+  nameEl.textContent = data.name || "Unknown";
+  bioEl.textContent = data.bio || "No bio available";
+}
+
+// GET SKILLS
+async function loadSkills() {
+  const q = query(collection(db, "skills"), where("ownerId", "==", mentorId));
+  const snap = await getDocs(q);
+
+  skillsList.innerHTML = "";
+
+  if (snap.empty) {
+    skillsList.innerHTML = `<p>No skills added yet.</p>`;
+    return;
+  }
+
+  snap.forEach(docSnap => {
+    const skill = docSnap.data();
+    const tag = document.createElement("span");
+    tag.className = "skill-tag";
+    tag.textContent = skill.title;
+    skillsList.appendChild(tag);
+  });
+}
+
+// EDIT PROFILE FEATURE
+const modal = document.getElementById("editModal");
+const editBtn = document.getElementById("editBtn");
+const closeModal = document.getElementById("closeModal");
+const saveBtn = document.getElementById("saveChanges");
+
+editBtn.onclick = () => {
+  modal.style.display = "flex";
+  document.getElementById("editName").value = nameEl.textContent;
+  document.getElementById("editBio").value = bioEl.textContent;
+};
+
+closeModal.onclick = () => modal.style.display = "none";
+
+// SAVE UPDATE
+saveBtn.onclick = async () => {
+  const newName = document.getElementById("editName").value.trim();
+  const newBio = document.getElementById("editBio").value.trim();
+  const newPhoto = document.getElementById("editPhoto").files[0];
+
+  const userRef = doc(db, "users", mentorId);
+  let updateData = { name: newName, bio: newBio };
+
+  if (newPhoto) {
+    const storage = getStorage();
+    const imgRef = ref(storage, `profile/${mentorId}`);
+    await uploadBytes(imgRef, newPhoto);
+    const url = await getDownloadURL(imgRef);
+    updateData.photo = url;
+  }
+
+  await updateDoc(userRef, updateData);
+  alert("Profile Updated Successfully!");
+  modal.style.display = "none";
+  loadMentorDetails();
+};
+
+// BACK BUTTON
+document.getElementById("backLink").onclick = () => 
+  location.href = "mentor_dashboard.html";
+
+</script>
+
+</body>
+</html>

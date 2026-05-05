@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillSwap+ | Mentor Dashboard</title>
+
+  <!-- Google Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded" rel="stylesheet" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f3f5f9;
+    }
+
+    header {
+      background: #2d89ef;
+      color: white;
+      padding: 18px;
+      font-size: 22px;
+      font-weight: 600;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .container {
+      max-width: 1150px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    .welcome {
+      font-size: 26px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 25px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 22px;
+      border-radius: 12px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+      transition: 0.25s;
+      cursor: pointer;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+    }
+
+    .icon {
+      font-size: 42px;
+      color: #2d89ef;
+    }
+
+    .card h3 {
+      margin: 12px 0 5px;
+      font-size: 20px;
+      color: #222;
+    }
+
+    .card p {
+      color: #555;
+      font-size: 15px;
+      margin: 0;
+    }
+
+    footer {
+      text-align: center;
+      color: #777;
+      padding: 20px;
+      margin-top: 30px;
+      font-size: 14px;
+    }
+    .logout-btn {
+  position: absolute;
+  right: 20px;
+  top: 18px;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.logout-btn:hover {
+  background: #dc2626;
+}
+
+  </style>
+</head>
+
+<body>
+
+  <header>
+    SkillSwap+ — Mentor Dashboard
+    <button id="logoutBtn" class="logout-btn">Logout</button>
+  </header>
+
+  <div class="container">
+    <div class="welcome">👋 Welcome, <span id="mentorName">Mentor</span>!</div>
+
+    <div class="grid">
+
+      <div class="card" onclick="location.href='requests.html'">
+        <span class="material-symbols-rounded icon">pending_actions</span>
+        <h3>Session Requests</h3>
+        <p>Review and accept requests from students.</p>
+      </div>
+
+      <div class="card" onclick="goToProfile()">
+        <span class="material-symbols-rounded icon">person</span>
+        <h3>Your Profile & Skills</h3>
+        <p>Update profile and manage your skill list.</p>
+      </div>
+
+      <div class="card" onclick="location.href='create-skill.html'">
+        <span class="material-symbols-rounded icon">add_circle</span>
+        <h3>Create New Skill</h3>
+        <p>Add a new skill you want to teach.</p>
+      </div>
+
+<div class="card" onclick="location.href='upload_notes.html'">
+      <span class="material-symbols-rounded icon">note_add</span>
+      <h3>Upload Notes</h3>
+      <p>Share notes with students</p>
+    </div>
+
+      <div class="card" onclick="location.href='live_sessions.html'">
+        <span class="material-symbols-rounded icon">videocam</span>
+        <h3>Live Sessions</h3>
+        <p>Start or join your live mentoring sessions.</p>
+      </div>
+
+      <div class="card" onclick="location.href='chat_mentor.html'">
+        <span class="material-symbols-rounded icon">chat</span>
+        <h3>Messages</h3>
+        <p>Chat with your students.</p>
+      </div>
+
+      <div class="card" onclick="location.href='wallet.html'">
+        <span class="material-symbols-rounded icon">account_balance_wallet</span>
+        <h3>Earnings</h3>
+        <p>Track credits earned from sessions.</p>
+      </div>
+
+      <div class="card" onclick="location.href='report_issues.html'">
+        <span class="material-symbols-rounded icon">report</span>
+        <h3>Report Issue</h3>
+        <p>Report a problem or student misconduct.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    © 2025 SkillSwap+. All Rights Reserved.
+  </footer>
+
+<script type="module">
+import { auth, db, doc, getDoc } from "./firebase.js";
+
+auth.onAuthStateChanged(async (user) => {
+  if (!user) {
+    location.href = "login.html";
+    return;
+  }
+
+  const userDoc = await getDoc(doc(db, "users", user.uid));
+  if (!userDoc.exists()) {
+    await auth.signOut();
+    location.href = "login.html";
+    return;
+  }
+
+  const userData = userDoc.data();
+
+  // 🔥 Block students from opening mentor dashboard
+  if (userData.role !== "mentor") {
+    alert("Access restricted to mentors only!");
+    location.href = "student_dashboard.html";
+    return;
+  }
+
+  document.getElementById("mentorName").textContent =
+    userData.name || "Mentor";
+});
+</script>
+<script type="module">
+import { auth } from "./firebase.js";
+
+window.goToProfile = function() {
+    const user = auth.currentUser;
+    if (!user) return location.href = "login.html";
+    location.href = `mentor-profile.html?id=${user.uid}`;
+};
+</script>
+<script type="module">
+import { auth } from "./firebase.js";
+import { signOut } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-auth.js";
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  signOut(auth)
+    .then(() => {
+      alert("Logged out successfully!");
+      window.location.href = "index.html"; // Redirect to landing page
+    })
+    .catch((error) => {
+      console.error("Logout error:", error.message);
+      alert("Logout failed!");
+    });
+});
+</script>
+
+</body>
+</html>
